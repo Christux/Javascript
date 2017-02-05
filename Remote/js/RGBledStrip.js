@@ -1,306 +1,505 @@
 /*
- * Copyright (C) 2016 Christux
+ * Led Strip Remote
+ *
+ * Author : Christux
+ * Version : 3.0
+ * Date : 5 fev 2017
  */
-
 (function (root) {
 
-    root.Remote = function (context_id) {
-
-        var elem;
-        var headerdiv;
-        var menudiv;
-        var contentdiv;
-        var page = 0; // 0-chose mode, 1-chose color, 2-disp about
-        var color;
-        var mode;
-
-        var menu_items = ["Mode", "Color", "About"];
-        var available_modes = [
-            "Static color", "Rainbow lamp", "Rainbow lamp rand",
-            "Rainbow", "Comet", "Breathing", "Fire", "Theater",
-            "Knight Rider", "Flag", "Off"];
-        var colors_tab = [// Colors, 5x3 grid
-            "rgb(255,0,0)", "rgb(255,128,0)", "rgb(255,215,0)",
-            "rgb(255,255,0)", "rgb(128,255,128)", "rgb(0,255,0)",
-            "rgb(0,255,128)", "rgb(0,255,255)", "rgb(0,128,255)",
-            "rgb(0,0,255)", "rgb(128,0,255)", "rgb(255,0,255)",
-            "rgb(255,128,128)", "rgb(255,0,128)", "rgb(255,255,255)"];
+    /*
+     */
+    root.Remote = function (contextId) {
 
         /*
-         * Generates web page
+         * Namespace RemoteApplication
          */
-        function generate_remote() {
-
-            generate_menu();
-            switch (page) {
-                case 1:
-                    generate_color_table();
-                    break;
-                case 2:
-                    generate_about();
-                    break;
-                default:
-                    generate_mode();
-            }
-        }
-        /*
-         * Generates menu bar
-         */
-        function generate_menu() {
-
-            menudiv.innerHTML = "";
-            for (var i = 0, len = menu_items.length; i < len; i++) {
-
-                var cell = document.createElement('div');
-                if (i === parseInt(page)) {
-                    cell.className = 'item_current';
-                } else {
-                    cell.className = 'item';
-                }
-
-                cell.innerHTML = menu_items[i];
-
-                // Associate reload page function                
-                cell.onclick = (function (I) {
-                    return function () {
-                        change_page(I);
-                    };
-                })(i);
-
-                menudiv.appendChild(cell);
-            }
-        }
-
-        /*
-         * Changes page
-         */
-        function change_page(new_page) {
-            page = new_page;
-            generate_remote();
-        }
-        /*
-         * Generates mode page
-         */
-        function generate_mode() {
-            contentdiv.innerHTML = "";
-            var modediv = document.createElement('div');
-            modediv.id = 'mode';
-            contentdiv.appendChild(modediv);
-            for (var i = 0, len = available_modes.length; i < len; i++) {
-
-                var cell = document.createElement('div');
-                if (i === parseInt(mode)) {
-                    cell.className = 'item_current';
-                } else {
-                    cell.className = 'item';
-                }
-
-                cell.innerHTML = available_modes[i];
-                cell.onclick = (function (I) {
-                    return function () {
-                        send_mode(I);
-                        generate_mode();
-                    };
-                })(i);
-                modediv.appendChild(cell);
-            }
-        }
-        /*
-         * Generates color table
-         */
-        function generate_color_table() {
-            contentdiv.innerHTML = "";
-            var values = new Array();
-            var rgb = color.split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
-            var r = parseInt(rgb[1]);
-            var g = parseInt(rgb[2]);
-            var b = parseInt(rgb[3]);
-            var brightness = Math.max(r, g, b, 1); // Avoid dividing by zero
-            var brightIdx = Math.max(0, Math.round(6 - brightness / (255 / 6)));
-
-            for (var i = 0; i < 6; i++) {
-
-                var newR = Math.round(r * (1 - 1 / 6 * i) * 255 / brightness);
-                var newG = Math.round(g * (1 - 1 / 6 * i) * 255 / brightness);
-                var newB = Math.round(b * (1 - 1 / 6 * i) * 255 / brightness);
-                values[i] = "rgb(" + newR + "," + newG + "," + newB + ")";
-            }
+        var RemoteApplication = (function () {
 
             /*
-             * Values selector
+             * Page object (abstract class)
              */
-            var colors = Array();
+            function Page(label) {
 
-            // Adjust color table to brightness
-            for (var i = 0, len = colors_tab.length; i < len; i++) {
-                var rgb = colors_tab[i].split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
-                var r = parseInt(rgb[1]);
-                var g = parseInt(rgb[2]);
-                var b = parseInt(rgb[3]);
-                var newR = Math.round(r * brightness / 255);
-                var newG = Math.round(g * brightness / 255);
-                var newB = Math.round(b * brightness / 255);
-                colors[i] = "rgb(" + newR + "," + newG + "," + newB + ")";
-            }
+                var node = document.createElement('div');
 
-            var colortable = document.createElement('div');
-            colortable.id = 'colorTable';
-            contentdiv.appendChild(colortable);
-            var tablebody = document.createElement('div');
-            tablebody.className = 'divTableBody';
-            colortable.appendChild(tablebody);
-            var tablerow = document.createElement('div');
-            tablerow.className = 'divTableRow';
-            tablebody.appendChild(tablerow);
-            for (var i = 0; i < 6; i++) {
-                var cell = document.createElement('div');
-                cell.className = 'divTableCell';
-                cell.style.cssText = "background-color:" + values[i];
-                if (i === brightIdx)
-                    cell.style.cssText = "border-style: solid;border-width: 0.5em;border-color:white;background-color:" + values[i];
-                // Attach click function
-                cell.onclick = (function (I) {
-                    return function () {
-                        send_color(I);
-                        generate_color_table();
-                    };
-                })(values[i]);
-                tablerow.appendChild(cell);
-            }
-
-            /*
-             * Color grid
-             */
-            var colortable = document.createElement('div');
-            colortable.id = 'colorTable';
-            contentdiv.appendChild(colortable);
-            var tablebody = document.createElement('div');
-            tablebody.className = 'divTableBody';
-            colortable.appendChild(tablebody);
-            for (var i = 0; i < 5; i++) {
-
-                var tablerow = document.createElement('div');
-                tablerow.className = 'divTableRow';
-                tablebody.appendChild(tablerow);
-                for (var j = 0; j < 3; j++) {
-
-                    var cell = document.createElement('div');
-                    cell.className = 'divTableCell';
-                    cell.style.cssText = "background-color:" + colors_tab[i * 3 + j];
-                    // Attach click function
-                    cell.onclick = (function (I) {
-                        return function () {
-                            send_color(I);
-                            generate_color_table();
-                        };
-
-                    })(colors[i * 3 + j]);
-                    tablerow.appendChild(cell);
-                }
-            }
-        }
-        /*
-         * Generates about page
-         */
-        function generate_about() {
-            contentdiv.innerHTML = "";
-            var aboutdiv = document.createElement('div');
-            aboutdiv.id = 'about';
-            contentdiv.appendChild(aboutdiv);
-            aboutdiv.innerHTML = "<h1>Led Strip Control</h1>" +
-                    "<p>Copyright Christux 2016</p>" +
-                    "<p>All rights reserved</p>";
-        }
-
-        function send_mode(new_mode) {
-            mode = new_mode;
-            // Server url
-            var order = "/mode?page=" + mode;
-            // Sends request
-            send_request(order);
-        }
-
-        function send_color(new_color) {
-            color = new_color;
-            // Extraction of RGB values from string
-            var rgb = color.split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
-            var r = parseInt(rgb[1]);
-            var g = parseInt(rgb[2]);
-            var b = parseInt(rgb[3]);
-            // Reformat to server standard
-            var order = "/color?r=" + r + "&g=" + g + "&b=" + b;
-            // SEnds request
-            send_request(order);
-        }
-        /*
-         * HTTP request
-         */
-        function send_request(order) {
-
-            console.log(order);
-            var xhr = new XMLHttpRequest();
-
-            xhr.onreadystatechange = function () {
-
-                var response;
-                // If 
-                if (xhr.readyState === xhr.DONE) {
-                    if (xhr.status === 200) {
-                        response = xhr.responseText;
-                    } else {
-                        console.log("Error :",xhr.status," ", xhr.statusText);
+                return {
+                    getNode: function () {
+                        return node;
+                    },
+                    getLabel: function () {
+                        return label;
+                    },
+                    setVisibility: function (i, j) {
+                        node.id = i === j ? label.toLowerCase() : 'hidden';
                     }
-                } else {
-                    //console.log("Error :",xhr.status," ", xhr.statusText);
-                }
-                
-                return response;
-            };
+                };
+            }
 
-            xhr.onerror = function (e) {
-                console.log("Error Status: " + e.error);
-            };
+            /*
+             * Page panel, contains pages and manages pages visibility
+             */
+            function PagePanel() {
+
+                var pageList = [];
+
+                return {
+                    add: function (page) {
+                        page.setVisibility(pageList.length, 0);
+                        pageList.push(page);
+                        return;
+                    },
+                    getPageNode: function (idx) {
+                        return pageList[idx].getNode();
+                    },
+                    getPageList: function () {
+                        return pageList;
+                    },
+                    update: function (idx) {
+                        for (var i = 0, len = pageList.length; i < len; i++) {
+                            pageList[i].setVisibility(idx, i);
+                        }
+                    }
+                };
+            }
+
+            /*
+             * Button class
+             */
+            function Button(label, callback) {
+
+                var cell = document.createElement('div');
+                cell.innerHTML = label;
+                cell.onclick = function () {
+                    callback();
+                };
+                return {
+                    getNode: function () {
+                        return cell;
+                    },
+                    setClass: function (className) {
+                        cell.className = className;
+                        return;
+                    }
+                };
+            }
+
+            /*
+             * Button panel, contains buttons and manages checked button style
+             */
+            function ButtonPanel() {
+
+                var buttonList = [];
+                var className = function (i, j) {
+                    return i === j ? 'item_current' : 'item';
+                };
+                return {
+                    add: function (node, button) {
+                        button.setClass(className(buttonList.length, 0));
+                        node.appendChild(button.getNode());
+                        buttonList.push(button);
+                        return;
+                    },
+                    update: function (idx) {
+
+                        for (var i = 0, len = buttonList.length; i < len; i++) {
+                            buttonList[i].setClass(className(idx, i));
+                        }
+                        return;
+                    },
+                    getButton: function (idx) {
+                        return buttonList[idx];
+                    }
+                };
+            }
             
-            xhr.open('GET', order, true);
-            xhr.send(null);
-        }
+            /*
+             * Top menu bar
+             */
+            function Menu(pages) {
 
-        return (
-                function () {
+                var menudiv = document.createElement('div');
+                menudiv.id = 'menu';
+                var buttonPanel = ButtonPanel();
+                var changePage = function (idx) {
 
-                    return this.init();
-
-                }).call(
-                {
-                    // Erase remote div
-                    init: function () {
-
-                        elem = root.document.getElementById(context_id);
-                        mode = root.document.getElementById("page").value;
-                        color = root.document.getElementById("color").value;
-
-                        // Removes inputs
-                        elem.innerHTML = "";
-
-                        // Create page pattern
-                        // 
-                        //    ! Header !
-                        //    !! Menu !!
-                        //    !--------!
-                        //    ! Content!
-                        headerdiv = document.createElement('div');
-                        headerdiv.id = 'header';
-                        elem.appendChild(headerdiv);
-                        menudiv = document.createElement('div');
-                        menudiv.id = 'menu';
-                        headerdiv.appendChild(menudiv);
-                        contentdiv = document.createElement('div');
-                        contentdiv.id = 'content';
-                        elem.appendChild(contentdiv);
-
-                        generate_remote();
-                    }
+                    buttonPanel.update(idx);
+                    pages.update(idx);
+                    return;
+                };
+                // Init menu
+                for (var i = 0, len = pages.getPageList().length; i < len; i++) {
+                    buttonPanel.add(menudiv,
+                            Button(pages.getPageList()[i].getLabel(),
+                                    (function (I) {
+                                        return function () {
+                                            changePage(I);
+                                        };
+                                    })(i)));
                 }
-        );
+
+                return {
+
+                    getNode: function () {
+                        return menudiv;
+                    }
+                };
+            }
+
+            /*
+             * Mode selection page, inherit from Page
+             */
+            function ModePage(initMode) {
+
+                var page = Page("Mode");
+                var availableModes = [
+                    "Static color", "Rainbow lamp", "Rainbow lamp rand",
+                    "Rainbow", "Comet", "Breathing", "Fire", "Theater",
+                    "K2000", "Flag", "Off"];
+                var buttonPanel = ButtonPanel();
+                
+                function changeMode(idx) {
+                    buttonPanel.update(idx);
+                    Server.sendMode(idx);
+                    return;
+                };
+                // Add buttons to panel
+                for (var i = 0, len = availableModes.length; i < len; i++) {
+                    buttonPanel.add(page.getNode(),
+                            Button(availableModes[i],
+                                    (function (I) {
+                                        return function () {
+                                            changeMode(I);
+                                        };
+                                    })(i)));
+                }
+
+                // Set initial selection
+                buttonPanel.update(parseInt(initMode));
+
+                return {
+                    getPage: function () {
+                        return page;
+                    }
+                };
+            }
+
+            /*
+             * Color picker page page, inherit from Page
+             */
+            function ColorPickerPage(initColor) {
+
+                var page = Page("Color");
+
+                var Color = (function () {
+
+                    var colorTab = [// Colors, 5x3 grid
+                        "rgb(255,0,0)", "rgb(255,128,0)", "rgb(255,215,0)",
+                        "rgb(255,255,0)", "rgb(128,255,128)", "rgb(0,255,0)",
+                        "rgb(0,255,128)", "rgb(0,255,255)", "rgb(0,128,255)",
+                        "rgb(0,0,255)", "rgb(128,0,255)", "rgb(255,0,255)",
+                        "rgb(255,128,128)", "rgb(255,0,128)", "rgb(255,255,255)"];
+
+                    var bColors = [];
+                    var brightIdx;
+                    var gColors = [];
+
+                    return {
+
+                        update: function (color) {
+
+                            var rgb = color.split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
+                            var r = parseInt(rgb[1]);
+                            var g = parseInt(rgb[2]);
+                            var b = parseInt(rgb[3]);
+                            var brightness = Math.max(r, g, b, 1); // Avoid dividing by zero
+                            brightIdx = Math.max(0, Math.round(6 - brightness / (255 / 6)));
+                            for (var i = 0; i < 6; i++) {
+                                var newR = Math.round(r * (1 - 1 / 6 * i) * 255 / brightness);
+                                var newG = Math.round(g * (1 - 1 / 6 * i) * 255 / brightness);
+                                var newB = Math.round(b * (1 - 1 / 6 * i) * 255 / brightness);
+                                bColors[i] = "rgb(" + newR.toString() + "," + newG.toString() + "," + newB.toString() + ")";
+                            }
+
+                            // Adjust color table to brightness
+                            for (var i = 0, len = colorTab.length; i < len; i++) {
+                                var rgb = colorTab[i].split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
+                                var r = parseInt(rgb[1]);
+                                var g = parseInt(rgb[2]);
+                                var b = parseInt(rgb[3]);
+                                var newR = Math.round(r * brightness / 255);
+                                var newG = Math.round(g * brightness / 255);
+                                var newB = Math.round(b * brightness / 255);
+                                gColors[i] = "rgb(" + newR.toString() + "," + newG.toString() + "," + newB.toString() + ")";
+                            }
+                        },
+
+                        getColorTab: function () {
+                            return colorTab;
+                        },
+
+                        getBrightnessPanelColors: function () {
+                            return bColors;
+                        },
+
+                        getBrightnessIdx: function () {
+                            return brightIdx;
+                        },
+
+                        getGridColors: function () {
+                            return gColors;
+                        }
+                    };
+                })();
+
+                /*
+                 * Brightness color panel
+                 */
+                var BrightnessPanel = (function () {
+
+                    var colortable = document.createElement('div');
+                    colortable.id = 'colorTable';
+                    page.getNode().appendChild(colortable);
+
+                    var tablebody = document.createElement('div');
+                    tablebody.className = 'divTableBody';
+                    colortable.appendChild(tablebody);
+
+                    var tablerow = document.createElement('div');
+                    tablerow.className = 'divTableRow';
+                    tablebody.appendChild(tablerow);
+
+                    // Create button panel
+                    var brightnessPanel = ButtonPanel();
+
+                    function updateColorPanel() {
+
+                        var values = Color.getBrightnessPanelColors();
+                        var idx = Color.getBrightnessIdx();
+
+                        for (var i = 0; i < 6; i++) {
+
+                            if (i === idx)
+                                brightnessPanel.getButton(i).getNode().style.cssText 
+                                    = "border-style: solid;border-width: 0.5em;border-color:white;background-color:" + values[i];
+                            else
+                                brightnessPanel.getButton(i).getNode().style.cssText 
+                                    = "background-color:" + values[i];
+                        }
+                    }
+
+                    function changeBrightness(buttonIdx) {
+
+                        var values = Color.getBrightnessPanelColors();
+                        var pickedColor = values[buttonIdx];
+                        Color.update(pickedColor);
+                        updateColorPanel();
+                        Server.sendColor(pickedColor);
+                        return;
+                    }
+
+                    // Add buttons to panel
+                    for (var i = 0; i < 6; i++) {
+
+                        var button = Button("",
+                                (function (I) {
+                                    return function () {
+                                        changeBrightness(I);
+                                    };
+                                })(i));
+                        brightnessPanel.add(tablerow, button);
+                        button.getNode().className = 'divTableCell';
+                    }
+
+                    return {
+
+                        updateColorPanel: function () {
+                            updateColorPanel();
+                            return;
+                        }
+                    };
+                })();
+
+                /*
+                 * Color grid
+                 */
+                (function () {
+
+                    var colortable = document.createElement('div');
+                    colortable.id = 'colorTable';
+                    page.getNode().appendChild(colortable);
+
+                    var tablebody = document.createElement('div');
+                    tablebody.className = 'divTableBody';
+                    colortable.appendChild(tablebody);
+
+                    function changeColor(idx) {
+
+                        var colors = Color.getGridColors();
+                        var pickedColor = colors[idx];
+                        Color.update(pickedColor);
+                        BrightnessPanel.updateColorPanel();
+                        Server.sendColor(pickedColor);
+                        return;
+                    }
+
+                    var colorPanel = ButtonPanel();
+                    var colorTab = Color.getColorTab();
+
+                    // Add buttons to panel
+                    for (var i = 0; i < 5; i++) {
+
+                        var tablerow = document.createElement('div');
+                        tablerow.className = 'divTableRow';
+                        tablebody.appendChild(tablerow);
+                        for (var j = 0; j < 3; j++) {
+
+                            var button = Button("",
+                                    (function (I) {
+                                        return function () {
+                                            changeColor(I);
+                                        };
+                                    })(i * 3 + j));
+
+                            colorPanel.add(tablerow, button);
+                            button.getNode().className = 'divTableCell';
+                            button.getNode().style.cssText = "background-color:" + colorTab[i * 3 + j];
+                        }
+                    }
+                })();
+
+                // Init page
+                Color.update(initColor);
+                BrightnessPanel.updateColorPanel();
+
+                return {
+                    getPage: function () {
+                        return page;
+                    }
+                };
+            }
+
+            /*
+             * About page, inherit from Page
+             */
+            function AboutPage() {
+
+                var page = Page("About");
+                page.getNode().innerHTML = "<h1>Led Strip Control</h1>" +
+                        "<p>Copyright Christux 2017</p>" +
+                        "<p>All rights reserved</p>";
+                return {
+                    getPage: function () {
+                        return page;
+                    }
+                };
+            }
+
+            /*
+             * Constructor of application
+             */
+            return {
+
+                init: function (rootNode, mode, color) {
+
+                    // Create page pattern
+                    // 
+                    //    ! Header !
+                    //    !! Menu !!
+                    //    !--------!
+                    //    ! Content!
+
+                    var headerdiv = document.createElement('div');
+                    headerdiv.id = 'header';
+                    rootNode.appendChild(headerdiv);
+                    var contentdiv = document.createElement('div');
+                    contentdiv.id = 'content';
+                    rootNode.appendChild(contentdiv);
+                    // Create pages
+                    var pages = PagePanel();
+                    pages.add(ModePage(mode).getPage());
+                    pages.add(ColorPickerPage(color).getPage());
+                    pages.add(AboutPage().getPage());
+                    // Connect pages to DOM
+                    for (var i = 0; i < pages.getPageList().length; i++) {
+                        contentdiv.appendChild(pages.getPageNode(i));
+                    }
+
+                    // Auto generate menu from pages and connect to DOM
+                    headerdiv.appendChild(Menu(pages).getNode());
+                }
+            };
+        })();
+
+        /*
+         * Namespace Server
+         */
+        var Server = (function () {
+
+            /*
+             * HTTP request
+             */
+            function sendRequest(order) {
+
+                console.log(order);
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function () {
+
+                    if (xhr.readyState === xhr.DONE) {
+                        if (xhr.status === 200) {
+                            console.log(xhr.responseText);
+                        } else {
+                            console.log("Error :", xhr.status, " ", xhr.statusText);
+                        }
+                    }
+                };
+                xhr.onerror = function (e) {
+                    console.log("Error Status: " + e.error);
+                };
+                xhr.open('GET', order, true);
+                xhr.send(null);
+            }
+            
+            return {
+
+                sendMode: function (mode) {
+                    // Server url
+                    var order = "/mode?page=" + mode;
+                    sendRequest(order);
+                },
+                sendColor: function (color) {
+                    // Extraction of RGB values from string
+                    var rgb = color.split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
+                    var r = parseInt(rgb[1]);
+                    var g = parseInt(rgb[2]);
+                    var b = parseInt(rgb[3]);
+                    // Reformat to server standard
+                    var order = "/color?r=" + r + "&g=" + g + "&b=" + b;
+                    sendRequest(order);
+                }
+            };
+        })();
+
+
+        /*
+         * Constructor of Remote Application
+         */
+        return {
+
+            init: function () {
+
+                var rootNode = root.document.getElementById(contextId);
+
+                // Read initial data from server
+                var mode = root.document.getElementById("page").value;
+                var color = root.document.getElementById("color").value;
+
+                // Removes input data
+                rootNode.innerHTML = "";
+
+                // Construct web page
+                RemoteApplication.init(rootNode, mode, color);
+            }
+        }.init();
     };
-})(window.jQuery || this);
+})(this);

@@ -117,6 +117,10 @@ img {
 	text-align:center;
 }
 
+#hidden, .hidden {
+    display: none;
+}
+
 /*
  * Responsive design for desktop, default for mobile device
  */
