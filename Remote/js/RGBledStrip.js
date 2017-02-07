@@ -2,171 +2,266 @@
  * Led Strip Remote
  *
  * Author : Christux
- * Version : 3.0
- * Date : 5 fev 2017
+ * Version : 3.1
+ * Date : 8 fev 2017
  */
 (function (root) {
 
-    /*
-     */
     root.Remote = function (contextId) {
+
+        /*
+         * Namespace Server
+         */
+        var Server = (function () {
+
+            /*
+             * HTTP request
+             */
+            function sendRequest(order) {
+
+                console.log(order);
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function () {
+
+                    if (xhr.readyState === xhr.DONE) {
+                        if (xhr.status === 200) {
+                            console.log(xhr.responseText);
+                        } else {
+                            console.log("Error :", xhr.status, " ", xhr.statusText);
+                        }
+                    }
+                };
+                xhr.onerror = function (e) {
+                    console.log("Error Status: " + e.error);
+                };
+                xhr.open('GET', order, true);
+                xhr.send(null);
+            }
+
+            return {
+
+                sendMode: function (mode) {
+                    // Server url
+                    var order = "/mode?page=" + mode;
+                    sendRequest(order);
+                },
+                sendColor: function (color) {
+                    // Extraction of RGB values from string
+                    var rgb = color.split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
+                    var r = parseInt(rgb[1]);
+                    var g = parseInt(rgb[2]);
+                    var b = parseInt(rgb[3]);
+                    // Reformat to server standard
+                    var order = "/color?r=" + r + "&g=" + g + "&b=" + b;
+                    sendRequest(order);
+                }
+            };
+        })();
+
+        var GuiLib = (function () {
+
+            return {
+
+                Page: function (label) {
+
+                    var node = document.createElement('div');
+
+                    return {
+                        getNode: function () {
+                            return node;
+                        },
+                        getLabel: function () {
+                            return label;
+                        },
+                        setVisibility: function (isVisible) {
+                            node.id = isVisible === true ? label.toLowerCase() : 'hidden';
+                        },
+                        updateContent: function (args) {
+                            return;
+                        }
+                    };
+                },
+
+                PageContainer: function (rootNode) {
+
+                    var pageList = [];
+                    
+                    function goToPage(idx,args) {
+                        // Hide all pages and unhide requested page
+                            for (var i = 0, len = pageList.length; i < len; i++) {
+                                pageList[i].setVisibility(idx === i);
+                            }
+
+                            pageList[idx].updateContent(args);
+                    }
+
+                    return {
+                        add: function (page) {
+                            pageList.push(page);
+                            rootNode.appendChild(page.getNode());
+                            return;
+                        },
+                        goToPageNamed: function (pageName, args) {
+
+                            // Find index of page
+                            var idx = 0;
+                            for (var i = 0, len = pageList.length; i < len; i++) {
+                                if (pageList[i].getLabel().localeCompare(pageName) === 0)
+                                    idx = i;
+                            }
+                            goToPage(idx,args);
+                            return;
+                        },
+                        goToPageId: function(idx,args) {
+                            goToPage(idx,args);
+                            return;
+                        },
+                        getPageList: function () {
+                            return pageList;
+                        }
+                    };
+                },
+
+                Button: function (label, callback) {
+
+                    var cell = document.createElement('div');
+                    cell.innerHTML = label;
+                    cell.onclick = function () {
+                        callback();
+                    };
+                    return {
+                        getNode: function () {
+                            return cell;
+                        },
+                        setClass: function (className) {
+                            cell.className = className;
+                            return;
+                        }
+                    };
+                },
+
+                ButtonPanel: function () {
+
+                    var buttonList = [];
+                    var className = function (isSelected) {
+                        return isSelected === true ? 'item_current' : 'item';
+                    };
+                    return {
+                        add: function (node, button) {
+                            button.setClass(className(buttonList.length===0));
+                            node.appendChild(button.getNode());
+                            buttonList.push(button);
+                            return;
+                        },
+                        update: function (idx) {
+
+                            for (var i = 0, len = buttonList.length; i < len; i++) {
+                                buttonList[i].setClass(className(idx===i));
+                            }
+                            return;
+                        },
+                        getButton: function (idx) {
+                            return buttonList[idx];
+                        }
+                    };
+                },
+
+                Link: function (label, callback) {
+                    var link = document.createElement('div');
+                    link.id = "link";
+                    link.innerHTML = label;
+                    link.onclick = function () {
+                        callback();
+                    };
+                    return link;
+                }
+            };
+        })();
 
         /*
          * Namespace RemoteApplication
          */
-        var RemoteApplication = (function () {
+        var RemoteApplication = function (rootNode, initMode, initColor) {
 
-            /*
-             * Page object (abstract class)
-             */
-            function Page(label) {
 
-                var node = document.createElement('div');
+            // Create page pattern
+            // 
+            //    ! Header !
+            //    !! Menu !!
+            //    !--------!
+            //    ! Content!
 
-                return {
-                    getNode: function () {
-                        return node;
-                    },
-                    getLabel: function () {
-                        return label;
-                    },
-                    setVisibility: function (i, j) {
-                        node.id = i === j ? label.toLowerCase() : 'hidden';
-                    }
-                };
-            }
-
-            /*
-             * Page panel, contains pages and manages pages visibility
-             */
-            function PagePanel() {
-
-                var pageList = [];
-
-                return {
-                    add: function (page) {
-                        page.setVisibility(pageList.length, 0);
-                        pageList.push(page);
-                        return;
-                    },
-                    getPageNode: function (idx) {
-                        return pageList[idx].getNode();
-                    },
-                    getPageList: function () {
-                        return pageList;
-                    },
-                    update: function (idx) {
-                        for (var i = 0, len = pageList.length; i < len; i++) {
-                            pageList[i].setVisibility(idx, i);
-                        }
-                    }
-                };
-            }
-
-            /*
-             * Button class
-             */
-            function Button(label, callback) {
-
-                var cell = document.createElement('div');
-                cell.innerHTML = label;
-                cell.onclick = function () {
-                    callback();
-                };
-                return {
-                    getNode: function () {
-                        return cell;
-                    },
-                    setClass: function (className) {
-                        cell.className = className;
-                        return;
-                    }
-                };
-            }
-
-            /*
-             * Button panel, contains buttons and manages checked button style
-             */
-            function ButtonPanel() {
-
-                var buttonList = [];
-                var className = function (i, j) {
-                    return i === j ? 'item_current' : 'item';
-                };
-                return {
-                    add: function (node, button) {
-                        button.setClass(className(buttonList.length, 0));
-                        node.appendChild(button.getNode());
-                        buttonList.push(button);
-                        return;
-                    },
-                    update: function (idx) {
-
-                        for (var i = 0, len = buttonList.length; i < len; i++) {
-                            buttonList[i].setClass(className(idx, i));
-                        }
-                        return;
-                    },
-                    getButton: function (idx) {
-                        return buttonList[idx];
-                    }
-                };
-            }
+            var headerdiv = document.createElement('div');
+            headerdiv.id = 'header';
+            rootNode.appendChild(headerdiv);
             
-            /*
-             * Top menu bar
-             */
-            function Menu(pages) {
+            var contentdiv = document.createElement('div');
+            contentdiv.id = 'content';
+            rootNode.appendChild(contentdiv);
+            
+            var topMenu = (function () {
 
                 var menudiv = document.createElement('div');
                 menudiv.id = 'menu';
-                var buttonPanel = ButtonPanel();
-                var changePage = function (idx) {
+                var buttonPanel = GuiLib.ButtonPanel();
+                
+                function init(pageContainer) {
 
-                    buttonPanel.update(idx);
-                    pages.update(idx);
-                    return;
-                };
-                // Init menu
-                for (var i = 0, len = pages.getPageList().length; i < len; i++) {
-                    buttonPanel.add(menudiv,
-                            Button(pages.getPageList()[i].getLabel(),
-                                    (function (I) {
-                                        return function () {
-                                            changePage(I);
-                                        };
-                                    })(i)));
+                    function changePage(idx) {
+                        buttonPanel.update(idx);
+                        pageContainer.goToPageId(idx);
+                        return;
+                    }
+                    // Init menu
+                    for (var i = 0, len = pageContainer.getPageList().length; i < len; i++) {
+
+                        buttonPanel.add(menudiv,
+                                GuiLib.Button(pageContainer.getPageList()[i].getLabel(),
+                                        (function (I) {
+                                            return function () {
+                                                changePage(I);
+                                            };
+                                        })(i)));
+                    }
+
                 }
 
-                return {
-
+                return  {
                     getNode: function () {
                         return menudiv;
+                    },
+                    init: function (pageContainer) {
+                        init(pageContainer);
                     }
                 };
-            }
+            })();
+
+            headerdiv.appendChild(topMenu.getNode());
+
+            var pageContainer = GuiLib.PageContainer(contentdiv);
 
             /*
              * Mode selection page, inherit from Page
              */
-            function ModePage(initMode) {
+            var modePage = (function (initMode) {
 
-                var page = Page("Mode");
+                var page = GuiLib.Page("Mode");
                 var availableModes = [
                     "Static color", "Rainbow lamp", "Rainbow lamp rand",
                     "Rainbow", "Comet", "Breathing", "Fire", "Theater",
-                    "K2000", "Flag", "Off"];
-                var buttonPanel = ButtonPanel();
-                
+                    "Knight Rider", "Flag", "Sunrise","Off"];
+                var buttonPanel = GuiLib.ButtonPanel();
+
                 function changeMode(idx) {
                     buttonPanel.update(idx);
                     Server.sendMode(idx);
                     return;
-                };
+                }
+                
                 // Add buttons to panel
                 for (var i = 0, len = availableModes.length; i < len; i++) {
                     buttonPanel.add(page.getNode(),
-                            Button(availableModes[i],
+                            GuiLib.Button(availableModes[i],
                                     (function (I) {
                                         return function () {
                                             changeMode(I);
@@ -177,19 +272,17 @@
                 // Set initial selection
                 buttonPanel.update(parseInt(initMode));
 
-                return {
-                    getPage: function () {
-                        return page;
-                    }
-                };
-            }
+                return  page;
+            })(initMode);
+
+            pageContainer.add(modePage);
 
             /*
              * Color picker page page, inherit from Page
              */
-            function ColorPickerPage(initColor) {
+            var colorPickerPage = (function (initColor) {
 
-                var page = Page("Color");
+                var page = GuiLib.Page("Color");
 
                 var Color = (function () {
 
@@ -270,7 +363,7 @@
                     tablebody.appendChild(tablerow);
 
                     // Create button panel
-                    var brightnessPanel = ButtonPanel();
+                    var brightnessPanel = GuiLib.ButtonPanel();
 
                     function updateColorPanel() {
 
@@ -280,11 +373,11 @@
                         for (var i = 0; i < 6; i++) {
 
                             if (i === idx)
-                                brightnessPanel.getButton(i).getNode().style.cssText 
-                                    = "border-style: solid;border-width: 0.5em;border-color:white;background-color:" + values[i];
+                                brightnessPanel.getButton(i).getNode().style.cssText
+                                        = "border-style: solid;border-width: 0.5em;border-color:white;background-color:" + values[i];
                             else
-                                brightnessPanel.getButton(i).getNode().style.cssText 
-                                    = "background-color:" + values[i];
+                                brightnessPanel.getButton(i).getNode().style.cssText
+                                        = "background-color:" + values[i];
                         }
                     }
 
@@ -301,7 +394,7 @@
                     // Add buttons to panel
                     for (var i = 0; i < 6; i++) {
 
-                        var button = Button("",
+                        var button = GuiLib.Button("",
                                 (function (I) {
                                     return function () {
                                         changeBrightness(I);
@@ -343,7 +436,7 @@
                         return;
                     }
 
-                    var colorPanel = ButtonPanel();
+                    var colorPanel = GuiLib.ButtonPanel();
                     var colorTab = Color.getColorTab();
 
                     // Add buttons to panel
@@ -354,7 +447,7 @@
                         tablebody.appendChild(tablerow);
                         for (var j = 0; j < 3; j++) {
 
-                            var button = Button("",
+                            var button = GuiLib.Button("",
                                     (function (I) {
                                         return function () {
                                             changeColor(I);
@@ -372,115 +465,39 @@
                 Color.update(initColor);
                 BrightnessPanel.updateColorPanel();
 
-                return {
-                    getPage: function () {
-                        return page;
-                    }
-                };
-            }
+                return page;
+            })(initColor);
+
+            pageContainer.add(colorPickerPage);
 
             /*
              * About page, inherit from Page
              */
-            function AboutPage() {
+            var aboutPage = (function () {
 
-                var page = Page("About");
+                var page = GuiLib.Page("About");
                 page.getNode().innerHTML = "<h1>Led Strip Control</h1>" +
                         "<p>Copyright Christux 2017</p>" +
                         "<p>All rights reserved</p>";
-                return {
-                    getPage: function () {
-                        return page;
-                    }
-                };
-            }
+                
+                return page;
+            })();
+
+            pageContainer.add(aboutPage);
 
             /*
              * Constructor of application
              */
             return {
 
-                init: function (rootNode, mode, color) {
+                init: function () {
 
-                    // Create page pattern
-                    // 
-                    //    ! Header !
-                    //    !! Menu !!
-                    //    !--------!
-                    //    ! Content!
-
-                    var headerdiv = document.createElement('div');
-                    headerdiv.id = 'header';
-                    rootNode.appendChild(headerdiv);
-                    var contentdiv = document.createElement('div');
-                    contentdiv.id = 'content';
-                    rootNode.appendChild(contentdiv);
-                    // Create pages
-                    var pages = PagePanel();
-                    pages.add(ModePage(mode).getPage());
-                    pages.add(ColorPickerPage(color).getPage());
-                    pages.add(AboutPage().getPage());
-                    // Connect pages to DOM
-                    for (var i = 0; i < pages.getPageList().length; i++) {
-                        contentdiv.appendChild(pages.getPageNode(i));
-                    }
-
-                    // Auto generate menu from pages and connect to DOM
-                    headerdiv.appendChild(Menu(pages).getNode());
+                    topMenu.init(pageContainer);
+                    pageContainer.goToPageNamed("Mode");
                 }
-            };
-        })();
-
-        /*
-         * Namespace Server
-         */
-        var Server = (function () {
-
-            /*
-             * HTTP request
-             */
-            function sendRequest(order) {
-
-                console.log(order);
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function () {
-
-                    if (xhr.readyState === xhr.DONE) {
-                        if (xhr.status === 200) {
-                            console.log(xhr.responseText);
-                        } else {
-                            console.log("Error :", xhr.status, " ", xhr.statusText);
-                        }
-                    }
-                };
-                xhr.onerror = function (e) {
-                    console.log("Error Status: " + e.error);
-                };
-                xhr.open('GET', order, true);
-                xhr.send(null);
-            }
-            
-            return {
-
-                sendMode: function (mode) {
-                    // Server url
-                    var order = "/mode?page=" + mode;
-                    sendRequest(order);
-                },
-                sendColor: function (color) {
-                    // Extraction of RGB values from string
-                    var rgb = color.split(/rgb\(+(.+?)\,+(.+?)\,+(.+?)\)/);
-                    var r = parseInt(rgb[1]);
-                    var g = parseInt(rgb[2]);
-                    var b = parseInt(rgb[3]);
-                    // Reformat to server standard
-                    var order = "/color?r=" + r + "&g=" + g + "&b=" + b;
-                    sendRequest(order);
-                }
-            };
-        })();
-
-
+            }.init();
+        };
+        
         /*
          * Constructor of Remote Application
          */
@@ -498,7 +515,7 @@
                 rootNode.innerHTML = "";
 
                 // Construct web page
-                RemoteApplication.init(rootNode, mode, color);
+                RemoteApplication(rootNode, mode, color);
             }
         }.init();
     };
