@@ -8,17 +8,40 @@
 	<script type="text/javascript" src="./js/RGBledStrip.js"></script>
 	<link type="text/css" rel="stylesheet" href="./css/RGBledStrip.css"/>
 	<link href="./image/favicon.ico" rel="icon" type="image/x-icon" />
-	<script type="text/javascript">
-		window.onload = function () {
-    		this.Remote("remote");
-		};
-	</script>
 </head>	
 
 <body>
-	<div id="remote">
-		<input id="color" value="rgb(128,0,0)" />
-		<input id="page" value="1"/>
+
+	<header>
+		<nav>
+			<div class="button unactive">
+				<a href="#animation">Mode</a>
+			</div>
+			<div class="button active">
+				<a href="#color">Color</a>
+			</div>
+			<div class="button unactive">
+				<a href="#about">About</a>
+			</div>
+		</nav>
+	</header>
+	
+	<div id="content">
+		<section class="category animation">
+			<div id="animation"></div>
+		</section>
+		<section class="category color">
+			<div id="brightness"></div>
+			<div id="color"></div>
+		</section>
+		<section class="category about">
+			<h1>Led Strip Control</h1>
+			<p>Copyright Christux 2017</p>
+			<p>All rights reserved</p>
+			<div id="info">
+				<div class="button">Get more info</div>
+			</div>
+		</section>
 	</div>
+
 </body>
-</html>

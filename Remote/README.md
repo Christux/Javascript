@@ -5,8 +5,8 @@ License GPL : http://www.gnu.org/copyleft/gpl.html
 
 ## Summary :
 
-Javascript remote for RGB led strip controled by NodeMCU ship.</b>
-NodeMCU code is comong soon :)
+Javascript remote for RGB led strip controled by ESP-12E ship.</b>
+NodeMCU code is coming soon :)
 
 ## Screenshots :
 
