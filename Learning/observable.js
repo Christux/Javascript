@@ -1,6 +1,5 @@
 'use strict';
 
-
 function Observer(handlers) {
 	this.handlers = handlers;
 	this.isUnsubscribed = false;
@@ -49,7 +48,9 @@ function Subscription(unsubscribe) {
 
 Observable.of = function (value) {
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
 
 		setTimeout(function () {
 			observer.next(value);
@@ -66,23 +67,25 @@ Observable.from = function (values) {
 
 	var isUnsubscribed = false;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
 
 		setTimeout(function () {
 
 			values.forEach(function (value) {
-				if(!isUnsubscribed) observer.next(value);
+				if (!isUnsubscribed) observer.next(value);
 			});
 
-			if(!isUnsubscribed) observer.complete();
-		},
-		0);
+			if (!isUnsubscribed) observer.complete();
+		},0);
 
 		return new Subscription(function () {
+			if(!isUnsubscribed){
 				isUnsubscribed = true;
 				console.log('From unsubscribbed');
 			}
-		);
+		});
 	});
 };
 
@@ -90,31 +93,34 @@ Observable.range = function (min, max) {
 
 	var values = [];
 
-	for(var i = min; i <= max; i++) {
+	for (var i = min; i <= max; i++) {
 		values.push(i);
 	}
-
 	return Observable.from(values);
 }
 
 Observable.interval = function (period) {
 
 	var intervalHandler;
+	var isUnsubscribed = false;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
 
+		var observer = new Observer(obs);
 		var i = 0;
 
 		intervalHandler = setInterval(function () {
 			observer.next(i);
 			i++;
-		},period);
+		}, period);
 
 		return new Subscription(function () {
+			if(!isUnsubscribed) {
 				clearInterval(intervalHandler);
 				console.log('Interval unsubscribbed');
+				isUnsubscribed = true;
 			}
-		);
+		});
 	});
 };
 
@@ -126,7 +132,9 @@ Observable.prototype.take = function (n) {
 
 	var stream = this;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
 
 		var i = 0;
 
@@ -155,9 +163,8 @@ Observable.prototype.take = function (n) {
 		}));
 
 		return new Subscription(function () {
-				subscription.unsubscribe();
-			}
-		);
+			subscription.unsubscribe();
+		});
 	});
 };
 
@@ -165,7 +172,9 @@ Observable.prototype.filter = function (test) {
 
 	var stream = this;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
 
 		var subscription = stream.subscribe(new Observer({
 
@@ -184,9 +193,8 @@ Observable.prototype.filter = function (test) {
 		}));
 
 		return new Subscription(function () {
-				subscription.unsubscribe();
-			}
-		);
+			subscription.unsubscribe();
+		});
 	});
 };
 
@@ -194,7 +202,9 @@ Observable.prototype.map = function (map) {
 
 	var stream = this;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
 
 		var subscription = stream.subscribe(new Observer({
 
@@ -210,9 +220,8 @@ Observable.prototype.map = function (map) {
 		}));
 
 		return new Subscription(function () {
-				subscription.unsubscribe();
-			}
-		);
+			subscription.unsubscribe();
+		});
 	});
 };
 
@@ -220,7 +229,9 @@ Observable.prototype.do = function (todo) {
 
 	var stream = this;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
 
 		var subscription = stream.subscribe(new Observer({
 
@@ -237,19 +248,63 @@ Observable.prototype.do = function (todo) {
 		}));
 
 		return new Subscription(function () {
-				subscription.unsubscribe();
-			}
-		);
+			subscription.unsubscribe();
+		});
 	});
 };
+
+Observable.prototype.merge = function() {
+
+	var observables = [this];
+	for (var i = 0; i < arguments.length; i++) {
+        observables.push(arguments[i]);
+    }
+
+	var subscriptions = [];
+	var completeCount = 0;
+
+	return new Observable(function subscribe(obs) {
+
+		var observer = new Observer(obs);
+
+		observables.forEach(function(stream){
+			subscriptions.push(stream.subscribe(new Observer({
+
+				next: function (value) {
+					observer.next(value);
+				},
+				error: function (err) {
+					observer.error(err);
+				},
+				complete: function () {
+					completeCount++;
+					if(completeCount === subscriptions.length) {
+						observer.complete();
+					}
+				}
+			})));
+		});
+
+		return new Subscription(function unsubscribe() {
+			subscriptions.forEach(function(subscription){
+				subscription.unsubscribe();
+			});
+		});
+	});
+};
+
 
 Observable.prototype.mergeMap = function (mergeMap) {
 
 	var stream = this;
 
-	return new Observable(function (observer) {
+	return new Observable(function (obs) {
 
-		var subscription = stream.subscribe(new Observer({
+		var observer = new Observer(obs);
+		var subscriptions = [];
+		var completeCount = 0;
+
+		subscriptions.push(stream.subscribe(new Observer({
 
 			next: function (value) {
 
@@ -258,12 +313,56 @@ Observable.prototype.mergeMap = function (mergeMap) {
 						observer.next(_value);
 					},
 					error: function (err) {
-						observer.error(err);
+						error(err);
 					},
 					complete: function () {
-						sub.unsubscribe();
+						complete();
+						//sub.unsubscribe();
 					}
 				}));
+
+				subscriptions.push(sub);
+			},
+			error: function (err) {
+				error(err);
+			},
+			complete: function () {
+				complete();
+			}
+		})));
+
+		return new Subscription(function () {
+			subscriptions.forEach(function(subscription){
+				subscription.unsubscribe();
+			});
+		});
+
+		function error(err) {
+			observer.error(err);
+		}
+
+		function complete() {
+			completeCount++;
+			if(completeCount === subscriptions.length) {
+				observer.complete();
+			}
+		}
+	});
+};
+
+Observable.prototype.tic = function() {
+
+	var stream = this;
+
+	return new Observable(function (obs) {
+
+		var observer = new Observer(obs);
+		var count = 0;
+
+		var subscription = stream.subscribe(new Observer({
+
+			next: function (value) {
+				observer.next(count++);
 			},
 			error: function (err) {
 				observer.error(err);
@@ -274,9 +373,8 @@ Observable.prototype.mergeMap = function (mergeMap) {
 		}));
 
 		return new Subscription(function () {
-				subscription.unsubscribe();
-			}
-		);
+			subscription.unsubscribe();
+		});
 	});
 };
 
@@ -300,20 +398,25 @@ const observer = {
 
 //const numbers$ = Observable.range(4,8);
 
-const numbers$ = Observable.interval(500)
-	.do(function (value) {
-		console.log('From interval: ' + value.toString());
-	})
-	.filter(function (value) {
-		return value % 2 === 0
-	})
-	.map(function (value) {
-		return value + 1;
-	})
-	.mergeMap(function (value) {
-		return Observable.from([value * 1, value * 2, value * 3]).take(2);
-	})
-	.take(8);
+// const numbers$ = Observable.interval(500)
+// 	.do(function (value) {
+// 		console.log('Interval: ' + value.toString());
+// 	})
+// 	.filter(function (value) {
+// 		return value % 2 === 0
+// 	})
+// 	.map(function (value) {
+// 		return value + 1;
+// 	})
+// 	.mergeMap(function (value) {
+// 		return Observable.from([value * 1, value * 2, value * 3]).take(2);
+// 	})
+// 	.take(8);
+
+const numbers$ = Observable.of(5).merge(
+					Observable.interval(500).take(10),
+					Observable.interval(1000).take(2)
+				).tic().take(10);
 
 const subscription = numbers$.subscribe(observer);
 
